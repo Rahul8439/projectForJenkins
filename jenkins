@@ -1,0 +1,55 @@
+pipeline {
+    agent any
+    tools {
+        jdk 'jdk-17'
+        maven 'Maven3'
+    }
+    environment{
+        SCANNER_HOME=tool 'SonarQube-Scanner'
+    }
+    stages {
+        stage('Git Checkout') {
+            steps {
+                git branch: 'main', changelog: false, credentialsId: 'f635b8ae-e2ba-435f-8452-825caf5ca4e3', poll: false, url: 'https://github.com/Rahul8439/projectForJenkins.git'
+            }
+        }
+        stage('Compile') {
+            steps {
+                bat "mvn clean compile"
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                // Run SonarQube Scanner
+                withSonarQubeEnv('SonarQube') {
+                    bat 'mvn sonar:sonar'
+                }
+            }
+        }
+        stage('BUILD') {
+            steps {
+                bat "mvn clean package"
+            }
+        }
+        stage('Docker Build Image and Push') {
+            steps {
+                script{
+                    withDockerRegistry(credentialsId: '0efae233-c6de-4677-a249-c7a54437c519') {
+                        bat "docker build -t spring-boot-app-using-jenkins ."
+                        bat "docker tag spring-boot-app-using-jenkins rahul8439/spring-boot-app-using-jenkins:latest"
+                        bat "docker push rahul8439/spring-boot-app-using-jenkins:latest"
+                    }
+                }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                script{
+                    withDockerRegistry(credentialsId: '0efae233-c6de-4677-a249-c7a54437c519') {
+                        bat "docker run --name spring-boot-app-using-jenkins_container -d -p 8081:8081 rahul8439/spring-boot-app-using-jenkins:latest"
+                    }
+                }
+            }
+        }
+    }
+}
